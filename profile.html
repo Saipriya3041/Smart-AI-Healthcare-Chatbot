@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - Healthcare Chatbot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+        .profile-container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .profile-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #3498db;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 20px;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .btn-download {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+        }
+        .btn-download:hover {
+            background: #2980b9;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container profile-container">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <h2 id="username">Loading...</h2>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Account Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="updateProfileForm">
+                            <div class="mb-3">
+                                <label class="form-label">New Password</label>
+                                <input type="password" class="form-control" id="newPassword" name="password">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Confirm New Password</label>
+                                <input type="password" class="form-control" id="confirmPassword">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Password</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Recent Activity</h5>
+                        <span class="badge bg-primary" id="summaryCount">0 summaries</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="summaryStats">
+                            <p>Last consultation: <span id="lastConsultation">Never</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Summary History</h5>
+            </div>
+            <div class="card-body">
+                <div id="summaryHistory" class="accordion">
+                    <!-- Summary history will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load user profile data
+            fetch('/auth/profile/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('username').textContent = data.username;
+                    document.getElementById('summaryCount').textContent = `${data.summary_count} summaries`;
+                    if (data.last_consultation) {
+                        document.getElementById('lastConsultation').textContent = new Date(data.last_consultation).toLocaleDateString();
+                    }
+                    
+                    // Populate summary history
+                    const summaryHistory = document.getElementById('summaryHistory');
+                    data.summaries.forEach((summary, index) => {
+                        const summaryCard = document.createElement('div');
+                        summaryCard.className = 'accordion-item';
+                        summaryCard.innerHTML = `
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#summary-${index}">
+                                    Consultation on ${new Date(summary.date).toLocaleDateString()}
+                                </button>
+                            </h2>
+                            <div id="summary-${index}" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <h6>Symptoms:</h6>
+                                    <p>${summary.symptoms}</p>
+                                    <h6>Summary:</h6>
+                                    <p>${summary.summary}</p>
+                                </div>
+                            </div>
+                        `;
+                        summaryHistory.appendChild(summaryCard);
+                    });
+                })
+                .catch(error => console.error('Error loading profile:', error));
+
+            // Handle password update
+            document.getElementById('updateProfileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+
+                if (newPassword !== confirmPassword) {
+                    alert('Passwords do not match!');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/auth/update-password', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ password: newPassword })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        alert('Password updated successfully!');
+                        document.getElementById('updateProfileForm').reset();
+                    } else {
+                        alert(data.error || 'Failed to update password');
+                    }
+                } catch (error) {
+                    console.error('Error updating password:', error);
+                    alert('An error occurred while updating password');
+                }
+            });
+
+            // Check authentication status
+            fetch('/auth/check-auth')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.authenticated) {
+                        window.location.href = '/auth/login';
+                        return;
+                    }
+                    document.getElementById('username').textContent = data.username;
+                });
+
+            // Load summary history
+            loadSummaryHistory();
+
+            // Handle password update
+            document.getElementById('updateProfileForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+
+                if (newPassword !== confirmPassword) {
+                    alert('Passwords do not match!');
+                    return;
+                }
+
+                fetch('/auth/profile/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: newPassword
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert('Password updated successfully!');
+                        document.getElementById('updateProfileForm').reset();
+                    }
+                });
+            });
+        });
+
+        function loadSummaryHistory() {
+            fetch('/auth/summary/history')
+                .then(response => response.json())
+                .then(data => {
+                    const summaryHistory = document.getElementById('summaryHistory');
+                    summaryHistory.innerHTML = '';
+
+                    if (data.summaries && data.summaries.length > 0) {
+                        document.getElementById('summaryCount').textContent = `${data.summaries.length} summaries`;
+                        document.getElementById('lastConsultation').textContent = new Date(data.summaries[0].created_at).toLocaleDateString();
+
+                        data.summaries.forEach((summary, index) => {
+                            const summaryCard = document.createElement('div');
+                            summaryCard.className = 'summary-card';
+                            summaryCard.innerHTML = `
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <h6 class="mb-1">Consultation #${index + 1}</h6>
+                                        <small class="text-muted">${new Date(summary.created_at).toLocaleString()}</small>
+                                    </div>
+                                    <button class="btn btn-download" onclick="downloadSummary(${index})">Download</button>
+                                </div>
+                                <p><strong>Symptoms:</strong> ${summary.symptoms}</p>
+                                <div class="summary-content">${summary.summary.replace(/\n/g, '<br>')}</div>
+                            `;
+                            summaryHistory.appendChild(summaryCard);
+                        });
+                    } else {
+                        summaryHistory.innerHTML = '<p class="text-center text-muted">No summary history available</p>';
+                    }
+                });
+        }
+
+        function downloadSummary(index) {
+            fetch('/auth/summary/history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.summaries && data.summaries[index]) {
+                        const summary = data.summaries[index];
+                        const content = `Healthcare Consultation Summary\n\nDate: ${new Date(summary.created_at).toLocaleString()}\n\nSymptoms: ${summary.symptoms}\n\n${summary.summary}`;
+                        
+                        const blob = new Blob([content], { type: 'text/plain' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `consultation_summary_${new Date(summary.created_at).toISOString().split('T')[0]}.txt`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    }
+                });
+        }
+    </script>
+</body>
+</html>
